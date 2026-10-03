@@ -1,14 +1,16 @@
 /**
  * The Agenda widget's data: up to three Google Calendars, read from the
- * "secret address in iCal format" each one offers. Like the BenchLM and TMDB
- * keys, those addresses stay on the server: the page asks this site's
- * /api/calendar relay, which fetches the feed and keeps it for a few minutes.
+ * "secret address in iCal format" each one offers. Google's feeds can't be read
+ * from a page on another site, so the page asks this site's /api/calendar relay,
+ * naming the feed's path in a header; the relay fetches it from Google Calendar
+ * alone and keeps it for a few minutes.
  *
  * The feed holds a calendar's whole history, so it is read once, expanded into
  * the months the widget can show, and only that is kept in the page's cache.
  * The iCal parser is a sizeable library and loads the first time it is needed.
  */
 import type ICAL from 'ical.js';
+import { CALENDAR_HEADER, calendarFeedPath } from './calendar-address';
 
 export type AgendaWidget = {
   id: string;
@@ -20,9 +22,11 @@ export type AgendaWidget = {
   count: number;
   /** Whether the month shows above the list. */
   month: boolean;
+  /** Each calendar's secret address in iCal format; up to CALENDAR_SLOTS, none until one is given. */
+  calendars: string[];
 };
 
-/** The relay serves /api/calendar/1 to /api/calendar/3, one per calendar. */
+/** How many calendars the widget can show; the relay serves /api/calendar/1 up to this number. */
 export const CALENDAR_SLOTS = 3;
 
 /** The widget browses from this many months back to this many ahead. */
@@ -56,7 +60,7 @@ export type AgendaCalendar = {
 
 export type AgendaData = {
   events: AgendaEvent[];
-  /** The calendars this server has an address for, in slot order. */
+  /** The calendars the widget has an address for, in slot order. */
   calendars: AgendaCalendar[];
 };
 
@@ -272,18 +276,31 @@ export const readCalendar = (
 
 type SlotResult =
   | { kind: 'ok'; name: string; events: AgendaEvent[] }
-  | { kind: 'unset' | 'no-relay' | 'rejected' | 'failed' };
+  | { kind: 'no-relay' | 'rejected' | 'failed' };
 
 const fetchSlot = async (
   library: Ical,
   slot: number,
+  address: string,
   window: { from: number; to: number },
   signal: AbortSignal
 ): Promise<SlotResult> => {
+  const path = calendarFeedPath(address);
+
+  // Settings only keep addresses that pass, but a hand-edited file can hold anything.
+  if (!path) {
+    return { kind: 'rejected' };
+  }
+
   let response: Response;
 
   try {
-    response = await fetch(`${RELAY}/${slot}`, { signal });
+    // The feed is private and the address is in a header, which a cache doesn't tell apart.
+    response = await fetch(`${RELAY}/${slot}`, {
+      signal,
+      cache: 'no-store',
+      headers: { [CALENDAR_HEADER]: path }
+    });
   } catch (error) {
     if (signal.aborted) {
       throw error;
@@ -292,13 +309,9 @@ const fetchSlot = async (
     return { kind: 'failed' };
   }
 
-  // The relay answers 204 for a calendar it has no address for, which is the usual case for the
-  // second and third.
-  if (response.status === 204 || response.status === 401 || response.status === 403) {
-    return { kind: 'unset' };
-  }
-
-  if (response.status === 404) {
+  // The relay turns away an address that isn't Google Calendar's (400), and Google says it doesn't
+  // know one that was reset (404) or that isn't shared with the page (401 or 403).
+  if ([400, 401, 403, 404].includes(response.status)) {
     return { kind: 'rejected' };
   }
 
@@ -322,11 +335,18 @@ const fetchSlot = async (
   }
 };
 
-export const fetchAgenda = async (now: Date, signal: AbortSignal): Promise<AgendaData> => {
+export const fetchAgenda = async (
+  now: Date,
+  addresses: readonly string[],
+  signal: AbortSignal
+): Promise<AgendaData> => {
   const library = (await import('ical.js')).default;
   const window = agendaWindow(now);
-  const slots = Array.from({ length: CALENDAR_SLOTS }, (_unused, index) => index + 1);
-  const results = await Promise.all(slots.map((slot) => fetchSlot(library, slot, window, signal)));
+  const results = await Promise.all(
+    addresses
+      .slice(0, CALENDAR_SLOTS)
+      .map((address, index) => fetchSlot(library, index + 1, address, window, signal))
+  );
   const answered = results.filter((result) => result.kind === 'ok');
 
   if (answered.length === 0) {
@@ -340,7 +360,7 @@ export const fetchAgenda = async (now: Date, signal: AbortSignal): Promise<Agend
 
     if (kinds.includes('rejected')) {
       throw new Error(
-        'Google Calendar didn’t accept the address this server has. If you reset the secret address, put the new one in .env.'
+        'Google Calendar didn’t accept the address. If you reset the secret address, paste the new one in this widget’s settings.'
       );
     }
 
@@ -348,17 +368,13 @@ export const fetchAgenda = async (now: Date, signal: AbortSignal): Promise<Agend
       throw new Error('Google Calendar didn’t answer.');
     }
 
-    throw new Error('The Agenda isn’t set up on this server yet: it needs a CALENDAR_ICAL_URL.');
+    throw new Error('Add a calendar address in this widget’s settings.');
   }
 
   const calendars: AgendaCalendar[] = [];
   const events: AgendaEvent[] = [];
 
   results.forEach((result, index) => {
-    if (result.kind === 'unset') {
-      return;
-    }
-
     const slot = index + 1;
     calendars.push({
       slot,

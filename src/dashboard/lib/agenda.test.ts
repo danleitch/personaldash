@@ -418,6 +418,12 @@ describe('readCalendar', () => {
 describe('fetchAgenda', () => {
   const now = new Date(2026, 9, 3, 12);
 
+  const home =
+    'https://calendar.google.com/calendar/ical/sam%40example.com/private-aaa111/basic.ics';
+  const work =
+    'https://calendar.google.com/calendar/ical/work%40example.com/private-bbb222/basic.ics';
+  const club = 'https://calendar.google.com/calendar/ical/club%40example.com/public/basic.ics';
+
   const reply = (body: string, init: ResponseInit = {}): Response =>
     new Response(body, {
       status: 200,
@@ -431,7 +437,7 @@ describe('fetchAgenda', () => {
       const answer = answers[Number(url.split('/').pop()) - 1];
       return typeof answer === 'function'
         ? Promise.resolve().then(answer)
-        : Promise.resolve(answer ?? new Response(null, { status: 204 }));
+        : Promise.resolve(answer ?? reply('', { status: 500 }));
     });
     vi.stubGlobal('fetch', fetchMock);
     return fetchMock;
@@ -446,52 +452,77 @@ describe('fetchAgenda', () => {
     event('UID:b@x', 'DTSTART:20261004T150000Z', 'DTEND:20261004T160000Z', 'SUMMARY:Review')
   );
 
-  it('asks the relay for each of the three calendars', async () => {
-    const fetchMock = serve(reply(planning));
-    await fetchAgenda(now, signal);
+  it('asks the relay for each address it is given, naming the feed by its path in a header', async () => {
+    const fetchMock = serve(reply(planning), reply(review));
+    await fetchAgenda(now, [home, work], signal);
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       '/api/calendar/1',
-      '/api/calendar/2',
-      '/api/calendar/3'
+      '/api/calendar/2'
+    ]);
+    expect(fetchMock.mock.calls.map(([, init]) => init.headers)).toEqual([
+      { 'X-Calendar-Feed': '/calendar/ical/sam%40example.com/private-aaa111/basic.ics' },
+      { 'X-Calendar-Feed': '/calendar/ical/work%40example.com/private-bbb222/basic.ics' }
     ]);
   });
 
-  it.each([204, 401, 403])('leaves out a slot the relay answers %i for', async (status) => {
-    serve(reply(planning), new Response(null, { status }));
-    const data = await fetchAgenda(now, signal);
+  it('never puts an address in the URL it asks for, or lets a cache keep the answer', async () => {
+    const fetchMock = serve(reply(planning));
+    await fetchAgenda(now, [home], signal);
 
-    expect(data.calendars.map((calendar) => calendar.slot)).toEqual([1]);
+    expect(fetchMock.mock.calls[0]![0]).not.toContain('private');
+    expect(fetchMock.mock.calls[0]![1]).toMatchObject({ cache: 'no-store', signal });
   });
 
-  it('reads one calendar, leaving out the slots that are not set up', async () => {
+  it('asks for no more than three calendars', async () => {
+    const fetchMock = serve(reply(planning), reply(review), reply(planning), reply(review));
+    await fetchAgenda(now, [home, work, club, home], signal);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('reads one calendar', async () => {
     serve(reply(planning));
 
-    await expect(fetchAgenda(now, signal)).resolves.toMatchObject({
+    await expect(fetchAgenda(now, [home], signal)).resolves.toMatchObject({
       calendars: [{ slot: 1, name: 'Home', ok: true }],
       events: [{ title: 'Planning', calendar: 0 }]
     });
   });
 
   it('merges several calendars, naming an unnamed one by its slot', async () => {
-    serve(reply(planning), reply('', { status: 401 }), reply(review));
-    const data = await fetchAgenda(now, signal);
+    serve(reply(planning), reply(review));
+    const data = await fetchAgenda(now, [home, work], signal);
 
     expect(data.calendars).toEqual([
       { slot: 1, name: 'Home', ok: true },
-      { slot: 3, name: 'Calendar 3', ok: true }
+      { slot: 2, name: 'Calendar 2', ok: true }
     ]);
     expect(data.events.map((item) => [item.title, item.calendar])).toEqual([
       ['Planning', 0],
-      ['Review', 2]
+      ['Review', 1]
     ]);
   });
+
+  it.each([400, 401, 403, 404])(
+    'keeps the calendars that answered when Google or the relay refuses another with %i',
+    async (status) => {
+      serve(reply(planning), reply('', { status }));
+      const data = await fetchAgenda(now, [home, work], signal);
+
+      expect(data.calendars).toEqual([
+        { slot: 1, name: 'Home', ok: true },
+        { slot: 2, name: 'Calendar 2', ok: false }
+      ]);
+      expect(titles(data.events)).toEqual(['Planning']);
+    }
+  );
 
   it('keeps the calendars that answered when another does not', async () => {
     serve(reply(planning), reply('', { status: 502 }), () => {
       throw new TypeError('Failed to fetch');
     });
-    const data = await fetchAgenda(now, signal);
+    const data = await fetchAgenda(now, [home, work, club], signal);
 
     expect(data.calendars).toEqual([
       { slot: 1, name: 'Home', ok: true },
@@ -507,23 +538,33 @@ describe('fetchAgenda', () => {
       reply('BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nEND:VCALENDAR'),
       reply('<html>an error page</html>', { headers: { 'content-type': 'text/plain' } })
     );
-    const data = await fetchAgenda(now, signal);
+    const data = await fetchAgenda(now, [home, work, club], signal);
 
     expect(data.calendars.map((calendar) => calendar.ok)).toEqual([true, false, false]);
   });
 
-  it('says the server is not set up when no calendar has an address', async () => {
-    serve();
+  it('turns away an address that is not Google Calendar’s without asking the relay', async () => {
+    const fetchMock = serve(reply(planning));
 
-    await expect(fetchAgenda(now, signal)).rejects.toThrow(
-      'The Agenda isn’t set up on this server yet: it needs a CALENDAR_ICAL_URL.'
+    await expect(
+      fetchAgenda(now, ['https://example.com/calendar/ical/a/public/basic.ics'], signal)
+    ).rejects.toThrow('Google Calendar didn’t accept the address.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('asks for an address when there are none', async () => {
+    const fetchMock = serve();
+
+    await expect(fetchAgenda(now, [], signal)).rejects.toThrow(
+      'Add a calendar address in this widget’s settings.'
     );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('says the host has no relay when it answers with its own page', async () => {
     serve(reply('<!doctype html>', { headers: { 'content-type': 'text/html' } }));
 
-    await expect(fetchAgenda(now, signal)).rejects.toThrow(
+    await expect(fetchAgenda(now, [home], signal)).rejects.toThrow(
       'The Agenda goes through this dashboard’s server, which this host doesn’t provide.'
     );
   });
@@ -531,15 +572,17 @@ describe('fetchAgenda', () => {
   it('says when Google does not know the address, as after a reset', async () => {
     serve(reply('', { status: 404 }));
 
-    await expect(fetchAgenda(now, signal)).rejects.toThrow(
-      'Google Calendar didn’t accept the address this server has. If you reset the secret address, put the new one in .env.'
+    await expect(fetchAgenda(now, [home], signal)).rejects.toThrow(
+      'Google Calendar didn’t accept the address. If you reset the secret address, paste the new one in this widget’s settings.'
     );
   });
 
   it('says when Google does not answer at all', async () => {
     serve(reply('', { status: 500 }));
 
-    await expect(fetchAgenda(now, signal)).rejects.toThrow('Google Calendar didn’t answer.');
+    await expect(fetchAgenda(now, [home], signal)).rejects.toThrow(
+      'Google Calendar didn’t answer.'
+    );
   });
 
   it('passes an abort on rather than calling it a failure', async () => {
@@ -549,6 +592,6 @@ describe('fetchAgenda', () => {
       throw new DOMException('Aborted', 'AbortError');
     });
 
-    await expect(fetchAgenda(now, controller.signal)).rejects.toThrow('Aborted');
+    await expect(fetchAgenda(now, [home], controller.signal)).rejects.toThrow('Aborted');
   });
 });

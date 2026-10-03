@@ -30,6 +30,9 @@ export const YAML_HEADER = `# Your dashboard: bookmarks, widgets and settings.
 #   an emoji like 🚀, or the address of any image.
 # Each of the three pages has its own widgets and groups, in order.
 # Widths are columns of a 12-column board, from 3 to 12.
+#
+# An Agenda widget keeps its Google Calendar addresses here. Anyone with an
+# address can read that calendar, so keep this file private.
 `;
 
 const bookmarkToYaml = (bookmark: Bookmark): Record<string, unknown> => ({

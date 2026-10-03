@@ -18,6 +18,24 @@ describe('dashboard YAML', () => {
     expect(parsed.ok && strip(parsed.value)).toEqual(strip(config));
   });
 
+  it('carries an Agenda’s calendar addresses in the export, and warns that they are private', () => {
+    const address =
+      'https://calendar.google.com/calendar/ical/sam%40example.com/private-aaa111/basic.ics';
+    const config = sanitizeConfig({ widgets: [{ type: 'agenda', calendars: [address] }] });
+    const yaml = configToYaml(config);
+
+    expect(yaml).toContain(address);
+    expect(yaml).toMatch(
+      /Anyone with an\n# address can read that calendar, so keep this file private/
+    );
+
+    const parsed = yamlToConfig(yaml);
+    expect(parsed.ok && parsed.value.pages[0].widgets[0]).toMatchObject({
+      type: 'agenda',
+      calendars: [address]
+    });
+  });
+
   it('leaves out fields that are at their defaults', () => {
     const yaml = configToYaml(
       sanitizeConfig({

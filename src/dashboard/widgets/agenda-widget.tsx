@@ -148,6 +148,17 @@ const AgendaRow = ({
   );
 };
 
+/** A short stand-in for the addresses in a cache key, so the secrets aren't spelled out in it. */
+const fingerprint = (text: string): string => {
+  let hash = 5381;
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash * 33) ^ text.charCodeAt(index)) >>> 0;
+  }
+
+  return hash.toString(36);
+};
+
 export const AgendaWidget = ({
   widget,
   clock,
@@ -156,11 +167,35 @@ export const AgendaWidget = ({
   widget: AgendaWidgetConfig;
   clock: HourFormat;
   newTab: boolean;
+}): JSX.Element =>
+  widget.calendars.length === 0 ? (
+    <WidgetState>Add a calendar address in this widget’s settings.</WidgetState>
+  ) : (
+    <AgendaBoard widget={widget} clock={clock} newTab={newTab} />
+  );
+
+const AgendaBoard = ({
+  widget,
+  clock,
+  newTab
+}: {
+  widget: AgendaWidgetConfig;
+  clock: HourFormat;
+  newTab: boolean;
 }): JSX.Element => {
-  const { weekStart, count, month } = widget;
+  const { weekStart, count, month, calendars } = widget;
   const now = useNow();
-  const load = useCallback((signal: AbortSignal) => fetchAgenda(new Date(), signal), []);
-  const { data, error, refresh } = useRemote('agenda', AGENDA_TTL_MS, load);
+  // The addresses are the reading's identity: other addresses are another reading altogether.
+  const addresses = calendars.join('\n');
+  const load = useCallback(
+    (signal: AbortSignal) => fetchAgenda(new Date(), addresses.split('\n'), signal),
+    [addresses]
+  );
+  const { data, error, refresh } = useRemote(
+    `agenda:${fingerprint(addresses)}`,
+    AGENDA_TTL_MS,
+    load
+  );
   // Null follows today, so the widget is on the right day after midnight too.
   const [picked, setPicked] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);

@@ -8,10 +8,9 @@ RUN npm run build
 FROM nginx:1.31-alpine AS runtime
 # Read from the container's resolv.conf at start, for the markets proxy.
 ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
-# Keys for the AI Leaderboard and Popular TV widgets, and the calendar addresses
-# for the Agenda, given at run time (never baked in). Defined empty so the
-# template always fills them in.
-ENV BENCHLM_TOKEN="" TMDB_TOKEN="" CALENDAR_ICAL_URL="" CALENDAR_ICAL_URL_2="" CALENDAR_ICAL_URL_3=""
+# Keys for the AI Leaderboard and Popular TV widgets, given at run time (never
+# baked in). Defined empty so the template always fills them in.
+ENV BENCHLM_TOKEN="" TMDB_TOKEN=""
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80

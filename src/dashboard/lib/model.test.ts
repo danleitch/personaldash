@@ -104,6 +104,32 @@ describe('sanitizeConfig', () => {
     });
   });
 
+  it('reads the Agenda’s calendar addresses, keeping only Google Calendar’s, once each, up to three', () => {
+    const a = 'https://calendar.google.com/calendar/ical/a%40x.com/private-aaa/basic.ics';
+    const b = 'https://calendar.google.com/calendar/ical/b%40x.com/private-bbb/basic.ics';
+    const c = 'https://calendar.google.com/calendar/ical/c%40x.com/public/basic.ics';
+    const d = 'https://calendar.google.com/calendar/ical/d%40x.com/private-ddd/basic.ics';
+    const [none, single, several, messy, odd] = sanitizeConfig({
+      widgets: [
+        { type: 'agenda' },
+        { type: 'agenda', calendars: a.replace('https:', 'webcal:') },
+        { type: 'agenda', calendars: [a, b, c, d] },
+        {
+          type: 'agenda',
+          calendars: ['nonsense', 'https://example.com/x.ics', 7, null, a, a, ' ' + b]
+        },
+        { type: 'agenda', calendars: { a } }
+      ]
+    }).pages[0].widgets;
+
+    expect(none).toMatchObject({ calendars: [] });
+    expect(single).toMatchObject({ calendars: [a] });
+    expect(several).toMatchObject({ calendars: [a, b, c] });
+    expect(messy).toMatchObject({ calendars: [a, b] });
+    expect(odd).toMatchObject({ calendars: [] });
+    expect(createWidget('agenda')).toMatchObject({ calendars: [] });
+  });
+
   it('reads the AI Leaderboard’s price limit, keeping it to a sensible range', () => {
     const [given, huge, negative, missing, text] = sanitizeConfig({
       widgets: [

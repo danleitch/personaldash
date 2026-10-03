@@ -7,8 +7,7 @@ services:
     container_name: homeslice
     ports:
       - '80'
-    # BENCHLM_TOKEN, TMDB_TOKEN and CALENDAR_ICAL_URL, for the widgets that need a key
-    # or an address; see .env.example.
+    # BENCHLM_TOKEN and TMDB_TOKEN, for the widgets that need a key; see .env.example.
     env_file:
       - path: .env
         required: false

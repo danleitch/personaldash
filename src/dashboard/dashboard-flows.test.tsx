@@ -347,7 +347,12 @@ describe('Dashboard flows', () => {
       expect(stored).not.toBeNull();
     });
 
-    it('adds an agenda straight away, which says so when no calendar answers', async () => {
+    it('adds an agenda straight away, which asks for a calendar address and asks nobody', async () => {
+      const asked: string[] = [];
+      vi.stubGlobal('fetch', (url: string) => {
+        asked.push(String(url));
+        return Promise.reject(new Error('Offline in tests.'));
+      });
       render(<App />);
       key({ key: 'e' });
 
@@ -355,8 +360,11 @@ describe('Dashboard flows', () => {
       await userEvent.click(screen.getByRole('button', { name: /^Agenda/ }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(await screen.findByRole('alert')).toHaveTextContent('Google Calendar didn’t answer.');
-      expect(screen.getByRole('region', { name: 'Agenda' })).toBeInTheDocument();
+      const agenda = screen.getByRole('region', { name: 'Agenda' });
+      expect(
+        within(agenda).getByText('Add a calendar address in this widget’s settings.')
+      ).toBeInTheDocument();
+      expect(asked.filter((url) => url.startsWith('/api/calendar'))).toEqual([]);
     });
 
     it('removes a widget, and can take it back', async () => {

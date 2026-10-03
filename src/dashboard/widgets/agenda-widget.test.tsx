@@ -71,8 +71,13 @@ const data = (rest: Partial<AgendaData> = {}): AgendaData => ({
   ...rest
 });
 
+const HOME = 'https://calendar.google.com/calendar/ical/sam%40example.com/private-aaa111/basic.ics';
+const WORK =
+  'https://calendar.google.com/calendar/ical/work%40example.com/private-bbb222/basic.ics';
+
 const widgetOf = (patch: Partial<AgendaConfig> = {}): AgendaConfig => ({
   ...(createWidget('agenda') as AgendaConfig),
+  calendars: [HOME],
   ...patch
 });
 
@@ -136,10 +141,41 @@ describe('AgendaWidget', () => {
       expect(await screen.findByText('Design review')).toBeInTheDocument();
     });
 
-    it('asks for the calendars as of now', async () => {
-      await loaded();
+    it('asks for the calendars it has addresses for, as of now', async () => {
+      await loaded({ calendars: [HOME, WORK] });
 
-      expect(fetchAgenda).toHaveBeenCalledWith(expect.any(Date), expect.any(AbortSignal));
+      expect(fetchAgenda).toHaveBeenCalledWith(
+        expect.any(Date),
+        [HOME, WORK],
+        expect.any(AbortSignal)
+      );
+    });
+
+    it('asks for an address, and asks nobody, when it has none', () => {
+      show({ calendars: [] });
+
+      expect(
+        screen.getByText('Add a calendar address in this widget’s settings.')
+      ).toBeInTheDocument();
+      expect(fetchAgenda).not.toHaveBeenCalled();
+    });
+
+    it('reads afresh when the addresses change, without spelling them out in its cache', async () => {
+      vi.mocked(fetchAgenda).mockResolvedValue(data());
+      const view = show({ calendars: [HOME] });
+      await screen.findByRole('grid', { name: /October 2026/ });
+
+      view.rerender(
+        <AgendaWidget widget={widgetOf({ calendars: [HOME, WORK] })} clock="24h" newTab={false} />
+      );
+      await screen.findByRole('grid', { name: /October 2026/ });
+
+      expect(fetchAgenda).toHaveBeenCalledTimes(2);
+      expect(vi.mocked(fetchAgenda).mock.calls[1]?.[1]).toEqual([HOME, WORK]);
+
+      const keys = Object.keys(window.localStorage).filter((key) => key.includes('agenda'));
+      expect(keys).toHaveLength(2);
+      expect(keys.join()).not.toMatch(/private|aaa111|bbb222|example/);
     });
   });
 

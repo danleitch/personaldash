@@ -6,7 +6,8 @@
  * a visitor exports and imports, so every field has a sanitiser: a hand-edited
  * file, an old export or a half-typed value must never break the page.
  */
-import type { AgendaWidget } from './agenda';
+import { CALENDAR_SLOTS, type AgendaWidget } from './agenda';
+import { readCalendarAddresses } from './calendar-address';
 import { emptyExtensions, sanitizeExtensions, type ExtensionsConfig } from './extensions-config';
 import { BENCH_SURFACES, type BenchmarkWidget } from './benchlm';
 import { TRENDING_SINCE, languageSlug, type GithubTrendingWidget } from './github';
@@ -477,7 +478,8 @@ const sanitizeWidget = (value: unknown): Widget | null => {
         width,
         weekStart: value.weekStart === 0 || value.weekStart === 'sunday' ? 0 : 1,
         count: Math.round(clampNumber(value.count, 3, 12, 5)),
-        month: value.month !== false
+        month: value.month !== false,
+        calendars: readCalendarAddresses(value.calendars, CALENDAR_SLOTS)
       };
     case 'github':
       return {
@@ -590,7 +592,7 @@ export const createWidget = (type: WidgetType): Widget => {
     case 'calendar':
       return { id, type, width: 3, weekStart: 1 };
     case 'agenda':
-      return { id, type, width: 4, weekStart: 1, count: 5, month: true };
+      return { id, type, width: 4, weekStart: 1, count: 5, month: true, calendars: [] };
     case 'github':
       return { id, type, width: 4, language: 'all', since: 'daily', count: 6 };
     case 'benchlm':

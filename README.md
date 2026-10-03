@@ -177,26 +177,34 @@ more, the list moves to the right.
 
 It needs no Google sign-in or Cloud project: Google gives every calendar a
 private web address that serves it as an iCal feed, and the dashboard reads
-that. Read-only, and it works with any calendar that has such an address.
+that. Read-only, and it works with any Google calendar you can open the settings of.
 
 1. In Google Calendar, open **Settings**, pick the calendar under **Settings
    for my calendars**, and scroll to **Integrate calendar**.
 2. Copy **Secret address in iCal format**.
-3. Put it in `.env` as `CALENDAR_ICAL_URL`, with no quotes. For a second and a
-   third calendar use `CALENDAR_ICAL_URL_2` and `CALENDAR_ICAL_URL_3`.
-4. Restart the server, then add the **Agenda** widget.
+3. Add the **Agenda** widget, open its settings (the sliders icon) and paste the
+   address under **Calendars**. There is room for three, each in its own
+   colour. Only Google Calendar's own feed addresses are accepted.
 
-Like the BenchLM and TMDB keys, the addresses never reach the page, the YAML or
-git: the page asks this server at `/api/calendar/1` to `/3`, which fetches the
-address it holds. Nginx keeps each feed for five minutes, so Google is asked
-about that often however many people visit, and the page looks every ten.
-Changes in Google Calendar can take a few minutes to show.
+The address is the key to your calendar, so treat it like a password:
 
-**This makes your calendar readable by anyone who can open the dashboard.**
-That is fine on a home network, or behind a VPN or a reverse proxy with a
-login. If the dashboard is open to the internet, put a login in front of it,
-or leave the Agenda out. Reset the secret address in Google Calendar if it
-ever leaks.
+- It is saved with your dashboard in this browser, and **it is in the YAML
+  export too**, so an exported file carries your calendar with it. That is what
+  lets you import the file on another device and have the Agenda just work, and
+  also why that file is not for sharing or committing. The export says so at
+  the top.
+- It is never put in a web address or a log: the page sends the feed's path to
+  this server in a header, and the server fetches it from `calendar.google.com`
+  and from nowhere else. Nginx keeps each feed for five minutes, so Google is
+  asked about that often, and the page looks every ten. Changes in Google
+  Calendar can take a few minutes to show.
+- Other people who open the dashboard on the same server don't see your
+  calendar: the address lives in your browser, not on the server, and they
+  would have to paste their own. The server's cache does hold a copy of each
+  feed for five minutes, so keep the server itself behind your VPN or a reverse
+  proxy with a login if it can be reached from outside your home.
+- Reset the secret address in Google Calendar if it ever leaks, then paste the
+  new one. The old one stops working at once.
 
 ```yaml
 widgets:
@@ -205,6 +213,8 @@ widgets:
     weekStart: 1 # 0 for Sunday
     count: 6 # events in the list, 3 to 12
     month: true # false for the list alone
+    calendars: # up to three secret addresses in iCal format
+      - https://calendar.google.com/calendar/ical/you%40example.com/private-0123abcd/basic.ics
 ```
 
 ### Extensions
@@ -521,9 +531,8 @@ docker build -t blades/homeslice:latest .
 The Dockerfile builds the site with Node 24 and serves it from Nginx. Then run
 it as above.
 
-`--env-file .env` gives the AI Leaderboard and Popular TV widgets their keys and
-the Agenda its calendar addresses; leave it out and those widgets say they
-aren't set up.
+`--env-file .env` gives the AI Leaderboard and Popular TV widgets their keys;
+leave it out and those widgets say they aren't set up.
 
 App will be available at `http://localhost:8080`.
 
@@ -538,7 +547,7 @@ This starts one service:
 - `homeslice` (serves the static app on internal container port `80`)
 
 It reads `.env` beside `docker-compose.yml` when there is one, for the
-BenchLM and TMDB keys and the calendar addresses.
+BenchLM and TMDB keys.
 
 If you ran an earlier version of this project, its service was called
 `branchify`. Add `--remove-orphans` once, so Compose removes the old container
@@ -552,11 +561,15 @@ so Nginx resolves Yahoo with the container's own DNS servers per request, which
 means the container starts even if DNS isn't up yet. Yahoo turns away TLS
 handshakes that look scripted, so the relay offers a browser-like cipher order.
 
-The Agenda's `/api/calendar/1` to `/api/calendar/3` relays work the same way for
-the calendar addresses in `.env`: each fetches only its own address, passes
-nothing the visitor sends, keeps the feed for five minutes and marks it
-`private`. A calendar with no address answers `204`, which the widget reads as
-not set up.
+The Agenda's `/api/calendar/1` to `/api/calendar/3` relays fetch one Google
+Calendar feed each. The page names the feed's path in an `X-Calendar-Feed`
+header, and Nginx only accepts a path shaped like a Google Calendar "secret
+address in iCal format" (`/calendar/ical/<id>/private-<key>/basic.ics`, or
+`.../public/basic.ics`), then fetches it from `calendar.google.com`: the host is
+fixed in the config, so the relay can't be pointed anywhere else, such as at
+other machines on your network. It keeps the feed for five minutes and marks it
+`private`. No header answers `204`, which the widget reads as no calendar yet,
+and a header that is not a Google Calendar path answers `400`.
 
 ## GitHub Actions to Docker Hub
 
