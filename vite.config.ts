@@ -1,6 +1,7 @@
 /// <reference types="vitest/config" />
 import { Agent } from 'node:https';
 import { defineConfig, loadEnv, type ProxyOptions } from 'vite';
+import { STATUS_SERVICES } from './src/dashboard/lib/status-services.ts';
 
 /**
  * Yahoo turns away TLS handshakes that look like a script's (Node's default
@@ -126,6 +127,21 @@ const calendarProxies = (env: Record<string, string>): Record<string, ProxyOptio
     })
   );
 
+/**
+ * The status bar's services: /api/status/<id> fetches that service's Statuspage
+ * summary from the one host listed for it, whatever the page asks for.
+ */
+const statusProxies: Record<string, ProxyOptions> = Object.fromEntries(
+  STATUS_SERVICES.map((service): [string, ProxyOptions] => [
+    `/api/status/${service.id}`,
+    {
+      target: `https://${service.host}`,
+      changeOrigin: true,
+      rewrite: () => '/api/v2/summary.json'
+    }
+  ])
+);
+
 export default defineConfig(({ mode }) => {
   // Every variable, not only VITE_ ones; none of these are put in the bundle.
   const env = loadEnv(mode, process.cwd(), '');
@@ -133,7 +149,8 @@ export default defineConfig(({ mode }) => {
     ...marketsProxy,
     ...pricingProxy,
     ...keyedProxies(env),
-    ...calendarProxies(env)
+    ...calendarProxies(env),
+    ...statusProxies
   };
 
   return {

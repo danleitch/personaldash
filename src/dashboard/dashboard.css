@@ -2167,6 +2167,15 @@ body {
   line-height: 1.45;
 }
 
+.field-hint a {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+.field-hint a:hover {
+  color: var(--ink);
+}
+
 .field-error {
   margin: 0;
   color: #ffadad;

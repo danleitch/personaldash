@@ -1,0 +1,150 @@
+/* --- Focus timer -------------------------------------------------------------
+   A ring that fills as the stretch goes, the time in the middle, and three
+   buttons. The ring is the accent colour for focus and green for a break. */
+
+.focus {
+  --focus-color: var(--accent);
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 2px 0 4px;
+}
+
+.focus[data-phase='rest'] {
+  --focus-color: #4ade80;
+}
+
+.focus-dial {
+  position: relative;
+  width: min(100%, 168px);
+  aspect-ratio: 1;
+}
+
+.focus-dial svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.focus-track,
+.focus-ring {
+  fill: none;
+  stroke-width: 6;
+}
+
+.focus-track {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.focus-ring {
+  stroke: var(--focus-color);
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset 0.3s linear,
+    stroke 0.3s ease;
+}
+
+.focus[data-running] .focus-ring {
+  filter: drop-shadow(0 0 5px var(--focus-color));
+}
+
+.focus-readout {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+}
+
+.focus-phase {
+  color: var(--ink-faint);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.focus-time {
+  color: var(--ink);
+  font-size: 2rem;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+
+.focus-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.focus-main,
+.focus-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.15s var(--ease);
+}
+
+.focus-main {
+  min-width: 96px;
+  padding: 7px 16px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--focus-color) 26%, transparent);
+  border-color: color-mix(in srgb, var(--focus-color) 60%, transparent);
+}
+
+.focus-icon {
+  width: 34px;
+  height: 34px;
+}
+
+.focus-main:hover,
+.focus-icon:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.focus-main:active,
+.focus-icon:active {
+  transform: scale(0.96);
+}
+
+.focus-done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.78rem;
+}
+
+.focus-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.focus-dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focus-ring,
+  .focus-main,
+  .focus-icon {
+    transition: none;
+  }
+}

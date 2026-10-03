@@ -636,6 +636,121 @@ describe('WidgetDialog', () => {
     });
   });
 
+  describe('Focus timer', () => {
+    it('shows the lengths and whether it chimes', () => {
+      open(widgetOf('focus', { focus: 50, rest: 10, sound: false }));
+
+      const focus = slider(/Focus: 50 minutes/);
+      expect(focus).toHaveAttribute('min', '5');
+      expect(focus).toHaveAttribute('max', '90');
+      expect(focus).toHaveAttribute('step', '5');
+      const rest = slider(/Break: 10 minutes/);
+      expect(rest).toHaveAttribute('min', '1');
+      expect(rest).toHaveAttribute('max', '30');
+      expect(screen.getByRole('switch', { name: /Chime when time is up/ })).not.toBeChecked();
+    });
+
+    it('says the timer is shared, and shows in the tab’s title', () => {
+      open(widgetOf('focus'));
+
+      expect(
+        screen.getByText(/shared by every Focus widget and every open tab/)
+      ).toBeInTheDocument();
+      expect(screen.getByText(/countdown shows in the tab's title/)).toBeInTheDocument();
+    });
+
+    it('saves different lengths and a chime turned off', async () => {
+      const { onSave } = open(widgetOf('focus'));
+
+      fireEvent.change(slider(/Focus: /), { target: { value: '45' } });
+      fireEvent.change(slider(/Break: /), { target: { value: '12' } });
+      await userEvent.click(screen.getByRole('switch', { name: /Chime when time is up/ }));
+      await save();
+
+      expect(saved(onSave)).toMatchObject({ type: 'focus', focus: 45, rest: 12, sound: false });
+    });
+
+    it('shows the new lengths as the sliders move', () => {
+      open(widgetOf('focus'));
+
+      fireEvent.change(slider(/Focus: /), { target: { value: '30' } });
+
+      expect(screen.getByText('Focus: 30 minutes')).toBeInTheDocument();
+    });
+  });
+
+  describe('My PRs', () => {
+    const TOKEN = 'github_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz';
+    const field = (): HTMLInputElement => screen.getByLabelText(/GitHub token/) as HTMLInputElement;
+
+    it('asks for a token in a masked field, and says what kind to make and where it goes', () => {
+      open(widgetOf('prs'));
+
+      expect(field()).toHaveAttribute('type', 'password');
+      expect(field()).toHaveAttribute('autocomplete', 'off');
+      expect(field()).toHaveValue('');
+      expect(screen.getByRole('link', { name: 'read-only token' })).toHaveAttribute(
+        'href',
+        'https://github.com/settings/personal-access-tokens/new'
+      );
+      expect(screen.getByText(/saved in this browser and in the YAML export/)).toBeInTheDocument();
+    });
+
+    it('shows the token it has, what is shown and how many', () => {
+      open(widgetOf('prs', { token: TOKEN, show: 'review', count: 7 }));
+
+      expect(field()).toHaveValue(TOKEN);
+      expect(screen.getByRole('radio', { name: 'To review' })).toBeChecked();
+      expect(slider(/Pull requests: 7/)).toHaveAttribute('max', '10');
+      expect(slider(/Pull requests: 7/)).toHaveAttribute('min', '3');
+    });
+
+    it('saves a token, a different list and number', async () => {
+      const { onSave } = open(widgetOf('prs'));
+
+      await userEvent.type(field(), `  ${TOKEN} `);
+      await choose('Show', 'Mine');
+      fireEvent.change(slider(/Pull requests: \d+/), { target: { value: '9' } });
+      await save();
+
+      expect(saved(onSave)).toMatchObject({ type: 'prs', token: TOKEN, show: 'mine', count: 9 });
+    });
+
+    it('saves without a token, and leaves it empty', async () => {
+      const { onSave } = open(widgetOf('prs'));
+      await save();
+
+      expect(saved(onSave)).toMatchObject({ token: '' });
+    });
+
+    it('turns away something that is not a token, without saving or repeating it', async () => {
+      const { onSave } = open(widgetOf('prs'));
+
+      await userEvent.type(field(), 'my password is hunter2 hunter2');
+      await save();
+
+      expect(onSave).not.toHaveBeenCalled();
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent('That doesn’t look like a GitHub token.');
+      expect(alert).not.toHaveTextContent('hunter2');
+    });
+
+    it('lets the mistake be mended', async () => {
+      const { onSave } = open(widgetOf('prs'));
+
+      await userEvent.type(field(), 'nope');
+      await save();
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+
+      await userEvent.clear(field());
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      await userEvent.type(field(), TOKEN);
+      await save();
+
+      expect(saved(onSave)).toMatchObject({ token: TOKEN });
+    });
+  });
+
   describe('Popular TV', () => {
     it('shows the window and how many shows, on a slider from 3 to 12', () => {
       open(widgetOf('tv', { window: 'day', count: 4 }));

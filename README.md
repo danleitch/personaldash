@@ -42,6 +42,10 @@ and you're free to spin up your own the same way (see
   shows the month with a dot under every day that has something on, and the
   days to come beneath it: what is on now, what is next and in how long, a
   button to join the call, and a click for the details.
+- **For developers.** A [status bar](#status-alerts) that appears across the top
+  only while a service you depend on is down, a [My PRs](#my-prs-reviews-and-ci)
+  widget for the reviews waiting on you and your own pull requests with their
+  checks, and a [focus timer](#focus-timer) that counts down in the tab's title.
 - **A side bar, as in VS Code.** Tools, apps and Extensions down the left edge,
   with Add, Edit and Settings at the foot. It tucks away behind a small tab
   until the pointer reaches the edge; Settings → General keeps it out.
@@ -154,6 +158,97 @@ asks `/api/benchlm/pricing` (Nginx keeps it for 84 hours, like the rankings) and
 only does so when a price limit is set. Models are matched to prices by name; a
 model BenchLM lists no price for, or whose name differs, is left out of a
 capped list, and the footer says how many.
+
+### Status alerts
+
+A strip across the top of the page that appears **only while a service you
+depend on is down**, and goes away when it recovers. Choose the services in
+**Settings → General → Status alerts**: GitHub, npm, Cloudflare, Vercel,
+Netlify, Docker, Anthropic, Discord and DigitalOcean. Nothing shows while they
+are all well.
+
+- It names the service and the incident, links to the service's own status page,
+  and folds a second or third incident behind **N more**.
+- **Dismiss** hides it until something changes: a new incident, or one that gets
+  worse, brings it back.
+- By default it is for outages. Turn on **Also tell me about slow or partly
+  broken service** to hear about degraded service too.
+- A service that can't be reached is left out quietly. The bar never raises an
+  alarm of its own, and with nothing chosen it doesn't even ask.
+
+Each of these services publishes an Atlassian Statuspage. The page asks
+`/api/status/<id>` on its own server, and Nginx (or the Vite dev server) fetches
+that one service's summary from the one host listed for its id in `nginx.conf`,
+so the page can't point it anywhere else, and keeps each answer for two minutes.
+A host without the relay (a plain static host) shows no bar. Adding a service is
+one line in `src/dashboard/lib/status-services.ts` and one in `nginx.conf`; a test
+fails if the two lists differ.
+
+```yaml
+status: # in the YAML next to the other settings
+  - github
+  - npm
+statusDegraded: false # true to hear about slow service too
+```
+
+### My PRs: reviews and CI
+
+The **My PRs** widget lists the pull requests **waiting for your review** and
+**your own open ones**, each with a dot for how its checks are going: green
+passing, red failing, amber running, hollow for none. Your own show where they
+stand with reviewers (Approved, Changes requested, Needs review) and which are
+drafts, and failing ones come first. **See all** goes to the rest on GitHub.
+
+It needs a GitHub token, entered in the widget's settings:
+
+1. Make a **read-only** token at
+   [github.com/settings/personal-access-tokens/new](https://github.com/settings/personal-access-tokens/new)
+   with read access to **Pull requests**, **Commit statuses** and **Checks** on
+   the repositories you want. (A classic token with the `repo` scope also works,
+   but it can do far more than this needs.)
+2. Open the widget's settings (the sliders icon) and paste it under **GitHub
+   token**.
+
+Treat the token like a password. It is saved with your dashboard in this browser,
+and **it is in the YAML export too**, so an exported file carries it; the export
+says so at the top. The page sends it to `api.github.com` and nowhere else
+(GitHub's API answers browsers on other sites, so there is no relay), and the
+widget's cache key holds only a fingerprint of it. It looks for new news every
+two minutes. Revoke the token on GitHub if it ever leaks.
+
+```yaml
+widgets:
+  - type: prs
+    width: 6
+    token: github_pat_… # read-only; keep this file private
+    show: both # or review, or mine
+    count: 5 # pull requests per list, 3 to 10
+```
+
+### Focus timer
+
+A **Focus timer** widget: a ring that fills as a stretch goes, with **Start /
+Pause**, **Reset** and **Skip**. A focus stretch is 25 minutes by default, then a
+5-minute break, and the widget counts the focus stretches you finish today.
+
+- The countdown shows in the **tab's title** while it runs (`24:31 · Focus`), so
+  you can see it from another tab, and the title comes back when it stops.
+- A soft chime marks the end of each stretch; turn it off in the widget's
+  settings. When a stretch ends, the next one waits for you to press Start.
+- It counts down to a moment, not by ticks, so it keeps time in a sleeping tab and
+  **survives a reload**. A stretch that ran out while the page was closed is
+  counted if it was just now, and let go if it was long ago.
+- There is one timer per browser, shared by every Focus widget and every open
+  tab of the dashboard, and it lives apart from the YAML (a running timer is not
+  something to export).
+
+```yaml
+widgets:
+  - type: focus
+    focus: 25 # minutes of focus, 5 to 90
+    rest: 5 # minutes of break, 1 to 30
+    sound: true # false for no chime
+```
 
 ### Agenda: your Google Calendar
 

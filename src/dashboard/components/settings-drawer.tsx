@@ -7,6 +7,7 @@ import {
   type DashboardSettings,
   type SearchEngine
 } from '../lib/model';
+import { STATUS_SERVICES, readStatusIds } from '../lib/status-services';
 import { configToYaml, yamlToConfig, type YamlProblem } from '../lib/yaml';
 import { Drawer, Field, Segmented, Switch } from './ui';
 
@@ -266,6 +267,39 @@ export const SettingsDrawer = ({
               checked={config.pinBar}
               onChange={(pinBar) => onChange({ pinBar })}
             />
+
+            <section className="settings-section">
+              <h3>Status alerts</h3>
+              <p className="field-hint">
+                A bar appears across the top of the page only while one of these services is down,
+                and goes away when it recovers. They are checked every few minutes.
+              </p>
+              <div className="status-choices" role="group" aria-label="Services to watch">
+                {STATUS_SERVICES.map((service) => (
+                  <label key={service.id} className="status-choice">
+                    <input
+                      type="checkbox"
+                      checked={config.status.includes(service.id)}
+                      onChange={(event) =>
+                        onChange({
+                          status: readStatusIds([
+                            ...config.status.filter((id) => id !== service.id),
+                            ...(event.target.checked ? [service.id] : [])
+                          ])
+                        })
+                      }
+                    />
+                    {service.name}
+                  </label>
+                ))}
+              </div>
+              <Switch
+                label="Also tell me about slow or partly broken service"
+                hint="Otherwise the bar is for outages only."
+                checked={config.statusDegraded}
+                onChange={(statusDegraded) => onChange({ statusDegraded })}
+              />
+            </section>
 
             <section className="settings-section">
               <h3>Keyboard</h3>

@@ -123,6 +123,63 @@ describe('sanitizeConfig', () => {
     expect(createWidget('benchlm')).toMatchObject({ maxPrice: 0 });
   });
 
+  it('reads which services the status bar watches, and whether it tells of slow service', () => {
+    const watched = sanitizeConfig({
+      status: ['npm', 'nonsense', 'github', 'npm', 5],
+      statusDegraded: true
+    });
+
+    expect(watched.status).toEqual(['github', 'npm']);
+    expect(watched.statusDegraded).toBe(true);
+    expect(sanitizeConfig({ status: 'vercel' }).status).toEqual(['vercel']);
+    expect(sanitizeConfig({ statusDegraded: 'yes' }).statusDegraded).toBe(false);
+
+    const none = sanitizeConfig({});
+    expect(none.status).toEqual([]);
+    expect(none.statusDegraded).toBe(false);
+  });
+
+  it('reads My PRs, keeping its settings within range and anything but a token out', () => {
+    const token = 'github_pat_11ABCDEFG0abcdefghijklmnopqrstuvwxyz';
+    const [plain, tuned, junk, bounded, low] = sanitizeConfig({
+      widgets: [
+        { type: 'prs' },
+        { type: 'prs', token: `  ${token} `, show: 'review', count: '8', width: 6 },
+        { type: 'prs', token: 'not a token at all', show: 'everything' },
+        { type: 'prs', count: 99 },
+        { type: 'prs', count: 1 }
+      ]
+    }).pages[0].widgets;
+
+    expect(plain).toMatchObject({ type: 'prs', width: 4, token: '', show: 'both', count: 5 });
+    expect(tuned).toMatchObject({ token, show: 'review', count: 8, width: 6 });
+    expect(junk).toMatchObject({ token: '', show: 'both' });
+    expect(bounded).toMatchObject({ count: 10 });
+    expect(low).toMatchObject({ count: 3 });
+    expect(createWidget('prs')).toMatchObject({ type: 'prs', token: '', show: 'both', count: 5 });
+  });
+
+  it('reads the Focus timer, keeping its lengths in range and its chime on unless turned off', () => {
+    const [plain, tuned, long, short, text, quiet] = sanitizeConfig({
+      widgets: [
+        { type: 'focus' },
+        { type: 'focus', focus: 50, rest: 10, sound: false, width: 6 },
+        { type: 'focus', focus: 500, rest: 500 },
+        { type: 'focus', focus: 1, rest: 0 },
+        { type: 'focus', focus: '40', rest: 'long' },
+        { type: 'focus', sound: 'no' }
+      ]
+    }).pages[0].widgets;
+
+    expect(plain).toMatchObject({ type: 'focus', width: 4, focus: 25, rest: 5, sound: true });
+    expect(tuned).toMatchObject({ focus: 50, rest: 10, sound: false, width: 6 });
+    expect(long).toMatchObject({ focus: 90, rest: 30 });
+    expect(short).toMatchObject({ focus: 5, rest: 1 });
+    expect(text).toMatchObject({ focus: 40, rest: 5 });
+    expect(quiet).toMatchObject({ sound: true });
+    expect(createWidget('focus')).toMatchObject({ type: 'focus', focus: 25, rest: 5, sound: true });
+  });
+
   it('keeps the glass within its range', () => {
     expect(sanitizeConfig({ glass: { blur: 400, tint: -1 } }).glass).toEqual({ blur: 32, tint: 0 });
   });

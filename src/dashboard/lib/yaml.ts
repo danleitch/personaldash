@@ -30,6 +30,9 @@ export const YAML_HEADER = `# Your dashboard: bookmarks, widgets and settings.
 #   an emoji like 🚀, or the address of any image.
 # Each of the three pages has its own widgets and groups, in order.
 # Widths are columns of a 12-column board, from 3 to 12.
+#
+# A My PRs widget keeps its GitHub token here. Anyone with the token can read
+# whatever it is allowed to, so keep this file private.
 `;
 
 const bookmarkToYaml = (bookmark: Bookmark): Record<string, unknown> => ({
@@ -69,6 +72,8 @@ export const configToObject = (config: DashboardConfig): Record<string, unknown>
   clock: config.clock,
   glass: { blur: config.glass.blur, tint: config.glass.tint },
   ...(config.pinBar ? { pinBar: true } : {}),
+  ...(config.status.length ? { status: config.status } : {}),
+  ...(config.statusDegraded ? { statusDegraded: true } : {}),
   ...(extensionsToYaml(config.extensions)
     ? { extensions: extensionsToYaml(config.extensions) }
     : {}),

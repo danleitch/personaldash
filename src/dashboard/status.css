@@ -1,0 +1,193 @@
+/* --- Status bar --------------------------------------------------------------
+   A strip across the top of the page, there only while a watched service is in
+   trouble. It sits above the board in the page's flow, so it moves the board
+   down rather than covering the greeting, and stays in view while you scroll. */
+
+.statusbar {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 9px clamp(14px, 3.2vw, 44px);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  background: rgba(40, 14, 18, 0.88);
+  border-bottom: 1px solid rgba(255, 122, 122, 0.45);
+  backdrop-filter: blur(10px);
+  animation: statusbar-in 0.3s var(--ease) both;
+}
+
+.statusbar[data-severity='degraded'] {
+  background: rgba(46, 34, 10, 0.88);
+  border-bottom-color: rgba(245, 194, 107, 0.45);
+}
+
+.statusbar-lines {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.statusbar-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.statusbar-line > svg {
+  flex: none;
+  margin-top: 2px;
+  color: #ff9a9a;
+}
+
+.statusbar-line[data-severity='degraded'] > svg {
+  color: #f5c26b;
+}
+
+.statusbar-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.statusbar-headline,
+.statusbar-affected {
+  color: var(--ink-soft);
+}
+
+.statusbar-link {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.statusbar-link:hover {
+  color: #fff;
+}
+
+.statusbar-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusbar-more,
+.statusbar-dismiss {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.statusbar-dismiss {
+  padding: 4px;
+}
+
+.statusbar-more:hover,
+.statusbar-dismiss:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.statusbar-more svg {
+  transition: transform 0.15s var(--ease);
+}
+
+.statusbar-more[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+@keyframes statusbar-in {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .statusbar {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .statusbar {
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  .statusbar-line {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  /* The text takes the row beside its icon; the link drops underneath it. */
+  .statusbar-text {
+    flex: 1 1 calc(100% - 28px);
+  }
+
+  .statusbar-link {
+    flex-basis: 100%;
+    margin-left: 24px;
+  }
+}
+
+/* --- Settings: which services to watch ------------------------------------- */
+
+.status-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.status-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.status-choice:has(input:checked) {
+  color: var(--ink);
+  background: rgba(138, 168, 255, 0.18);
+  border-color: rgba(138, 168, 255, 0.55);
+}
+
+.status-choice:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.status-choice input {
+  margin: 0;
+  accent-color: var(--accent);
+}

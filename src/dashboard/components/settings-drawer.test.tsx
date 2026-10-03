@@ -188,6 +188,67 @@ describe('SettingsDrawer', () => {
       expect(onChange).toHaveBeenNthCalledWith(2, { pinBar: true });
     });
 
+    describe('status alerts', () => {
+      const choice = (name: string): HTMLInputElement =>
+        within(screen.getByRole('group', { name: 'Services to watch' })).getByRole('checkbox', {
+          name
+        });
+
+      it('offers every service, with the ones watched ticked', () => {
+        open({ config: boardWith({ status: ['npm', 'github'] }) });
+
+        const boxes = within(screen.getByRole('group', { name: 'Services to watch' })).getAllByRole(
+          'checkbox'
+        ) as HTMLInputElement[];
+        expect(boxes.map((box) => box.parentElement?.textContent)).toEqual([
+          'GitHub',
+          'npm',
+          'Cloudflare',
+          'Vercel',
+          'Netlify',
+          'Docker',
+          'Anthropic',
+          'Discord',
+          'DigitalOcean'
+        ]);
+        expect(
+          boxes.filter((box) => box.checked).map((box) => box.parentElement?.textContent)
+        ).toEqual(['GitHub', 'npm']);
+      });
+
+      it('starts a service being watched, keeping them in the order they are offered', async () => {
+        const { onChange } = open({ config: boardWith({ status: ['npm'] }) });
+
+        await userEvent.click(choice('GitHub'));
+
+        expect(onChange).toHaveBeenCalledExactlyOnceWith({ status: ['github', 'npm'] });
+      });
+
+      it('stops one being watched', async () => {
+        const { onChange } = open({ config: boardWith({ status: ['github', 'npm'] }) });
+
+        await userEvent.click(choice('GitHub'));
+
+        expect(onChange).toHaveBeenCalledExactlyOnceWith({ status: ['npm'] });
+      });
+
+      it('says the bar is for outages unless slow service is asked for too', async () => {
+        const { onChange } = open();
+        const toggle = screen.getByRole('switch', { name: /slow or partly broken/ });
+
+        expect(toggle).not.toBeChecked();
+        await userEvent.click(toggle);
+
+        expect(onChange).toHaveBeenCalledExactlyOnceWith({ statusDegraded: true });
+      });
+
+      it('shows slow service already being asked for', () => {
+        open({ config: boardWith({ statusDegraded: true }) });
+
+        expect(screen.getByRole('switch', { name: /slow or partly broken/ })).toBeChecked();
+      });
+    });
+
     it('lists the keyboard shortcuts', () => {
       open();
       const list = screen.getByText('Keyboard').closest('section')!;

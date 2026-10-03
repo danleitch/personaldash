@@ -7,7 +7,9 @@ import {
   presetOf,
   type BenchPreset
 } from '../lib/benchlm';
+import { FOCUS_LIMITS } from '../lib/focus';
 import { POPULAR_LANGUAGES, TRENDING_SINCE, languageSlug } from '../lib/github';
+import { isToken, readToken } from '../lib/pulls';
 import {
   WIDGET_BLURBS,
   WIDGET_LABELS,
@@ -19,7 +21,7 @@ import {
 } from '../lib/model';
 import { WIDGET_ICONS } from '../widgets/widget-icons';
 import { WIDTH_OPTIONS } from './layout-options';
-import { Field, Modal, Segmented } from './ui';
+import { Field, Modal, Segmented, Switch } from './ui';
 
 export const WidgetPicker = ({
   types = WIDGET_TYPES,
@@ -116,6 +118,13 @@ export const WidgetDialog = ({ widget, onSave, onClose }: WidgetDialogProps): JS
       }
     }
 
+    if (draft.type === 'prs' && draft.token.trim() && !isToken(draft.token)) {
+      setError(
+        'That doesn’t look like a GitHub token. It is letters, numbers and underscores, 20 or more of them, like github_pat_… or ghp_…'
+      );
+      return;
+    }
+
     const cleaned: Widget =
       draft.type === 'markets'
         ? {
@@ -130,7 +139,9 @@ export const WidgetDialog = ({ widget, onSave, onClose }: WidgetDialogProps): JS
             ? { ...draft, location: draft.location.trim() }
             : draft.type === 'github'
               ? { ...draft, language: languageSlug(draft.language) }
-              : draft;
+              : draft.type === 'prs'
+                ? { ...draft, token: readToken(draft.token) }
+                : draft;
 
     onSave(cleaned);
   };
@@ -405,6 +416,93 @@ export const WidgetDialog = ({ widget, onSave, onClose }: WidgetDialogProps): JS
                 listed price are left out.
               </span>
             </div>
+          </>
+        )}
+
+        {draft.type === 'focus' && (
+          <>
+            <Field label={`Focus: ${draft.focus} minutes`}>
+              <input
+                type="range"
+                min={FOCUS_LIMITS.focus.min}
+                max={FOCUS_LIMITS.focus.max}
+                step={5}
+                value={draft.focus}
+                data-autofocus=""
+                onChange={(event) => patch({ focus: Number(event.target.value) })}
+              />
+            </Field>
+            <Field label={`Break: ${draft.rest} minutes`}>
+              <input
+                type="range"
+                min={FOCUS_LIMITS.rest.min}
+                max={FOCUS_LIMITS.rest.max}
+                value={draft.rest}
+                onChange={(event) => patch({ rest: Number(event.target.value) })}
+              />
+            </Field>
+            <Switch
+              label="Chime when time is up"
+              hint="The timer is shared by every Focus widget and every open tab of this dashboard, and its countdown shows in the tab's title."
+              checked={draft.sound}
+              onChange={(sound) => patch({ sound })}
+            />
+          </>
+        )}
+
+        {draft.type === 'prs' && (
+          <>
+            <Field
+              label="GitHub token"
+              hint={
+                <>
+                  Make a{' '}
+                  <a
+                    href="https://github.com/settings/personal-access-tokens/new"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    read-only token
+                  </a>
+                  : read access to Pull requests, Commit statuses and Checks on the repositories you
+                  want. It is saved in this browser and in the YAML export, so keep both private.
+                </>
+              }
+              error={error}
+            >
+              <input
+                type="password"
+                value={draft.token}
+                maxLength={255}
+                placeholder="github_pat_…"
+                autoComplete="off"
+                spellCheck={false}
+                data-autofocus=""
+                onChange={(event) => patch({ token: event.target.value })}
+              />
+            </Field>
+            <div className="field">
+              <span className="field-label">Show</span>
+              <Segmented
+                label="Show"
+                value={draft.show}
+                options={[
+                  { value: 'both', label: 'Both' },
+                  { value: 'review', label: 'To review' },
+                  { value: 'mine', label: 'Mine' }
+                ]}
+                onChange={(show) => patch({ show })}
+              />
+            </div>
+            <Field label={`Pull requests: ${draft.count}`} hint="Per list.">
+              <input
+                type="range"
+                min={3}
+                max={10}
+                value={draft.count}
+                onChange={(event) => patch({ count: Number(event.target.value) })}
+              />
+            </Field>
           </>
         )}
 

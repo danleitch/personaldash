@@ -1,0 +1,151 @@
+/* --- My PRs ------------------------------------------------------------------
+   Two short lists: what is waiting for your review, and your own open pull
+   requests, each with a dot for how its checks are going. */
+
+.prs {
+  display: grid;
+  gap: 14px;
+}
+
+.prs-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 4px;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.prs-count {
+  padding: 0 7px;
+  border-radius: 999px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.prs-all {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+}
+
+.prs-all:hover {
+  color: var(--accent);
+}
+
+.prs-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.prs-item {
+  display: flex;
+  gap: 10px;
+  padding: 7px 0;
+}
+
+.prs-item + .prs-item {
+  border-top: 1px solid var(--line);
+}
+
+/* A dot for the checks: green passing, red failing, amber running, hollow for none. */
+.prs-ci {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 999px;
+  background: #64748b;
+}
+
+.prs-ci[data-state='passing'] {
+  background: #4ade80;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+}
+
+.prs-ci[data-state='failing'] {
+  background: #ff7a7a;
+  box-shadow: 0 0 0 3px rgba(255, 122, 122, 0.2);
+}
+
+.prs-ci[data-state='pending'] {
+  background: #f5c26b;
+  box-shadow: 0 0 0 3px rgba(245, 194, 107, 0.2);
+}
+
+.prs-ci[data-state='none'] {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #64748b;
+}
+
+.prs-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.prs-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 520;
+  line-height: 1.35;
+  text-decoration: none;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.prs-title:hover {
+  color: var(--accent);
+}
+
+.prs-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 10px;
+  color: var(--ink-faint);
+  font-size: 0.72rem;
+}
+
+.prs-repo {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prs-tag {
+  padding: 0 7px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.prs-tag[data-review='approved'] {
+  color: #86efac;
+  background: rgba(74, 222, 128, 0.14);
+}
+
+.prs-tag[data-review='changes'] {
+  color: #fca5a5;
+  background: rgba(255, 122, 122, 0.15);
+}
+
+.prs-none {
+  margin: 2px 0 0;
+  color: var(--ink-faint);
+  font-size: 0.82rem;
+}

@@ -42,6 +42,7 @@ import { ImportDialog } from './components/import-dialog';
 import { SearchBox, type Command } from './components/search-box';
 import { SettingsDrawer, type SettingsTab } from './components/settings-drawer';
 import { PageDots } from './components/page-dots';
+import { StatusBar } from './components/status-bar';
 import { EditDock, EmptyBoard, TopBar } from './components/top-bar';
 import { ContextMenu, Toasts, type MenuItem } from './components/ui';
 import { WidgetDialog, WidgetPicker } from './components/widget-dialog';
@@ -824,207 +825,210 @@ export const Dashboard = ({
   const inert = { inert: '' } as Record<string, string>;
 
   return (
-    <div
-      className="dash"
-      data-editing={editing ? 'on' : undefined}
-      style={{ '--glass-blur': `${config.glass.blur}px` } as CSSProperties}
-    >
-      <ActivityBar
-        pinned={dashboard.pinBar}
-        items={barItems}
-        extras={headerExtras}
-        editing={editing}
-        extensionsOpen={extensionsOpen}
-        onOpenExtensions={() => setExtensionsOpen(true)}
-        onAddBookmark={() => openAdd()}
-        onToggleEdit={() => setEditing((current) => !current)}
-        onOpenSettings={() => setSettingsTab('general')}
-        onContextMenu={barMenu}
-      />
-
-      <TopBar name={config.name} clock={config.clock}>
-        <SearchBox
-          groups={allGroups(dashboard)}
-          engine={config.search}
-          newTab={config.newTab}
-          commands={commands}
-          inputRef={searchRef}
-        />
-      </TopBar>
-
-      <div className="pages" data-moving={leaving !== null ? '' : undefined}>
-        {Array.from({ length: PAGE_COUNT }, (_unused, index) => index)
-          .filter((index) => index === page || index === leaving)
-          .map((index) => (
-            <div
-              key={index}
-              className="page"
-              data-state={index === page ? 'current' : 'leaving'}
-              data-direction={direction ?? undefined}
-              {...(index === page ? {} : { 'aria-hidden': true, ...inert })}
-              onAnimationEnd={(event) => {
-                if (event.target === event.currentTarget && index !== page) {
-                  settle(index);
-                }
-              }}
-            >
-              {renderPage(index)}
-            </div>
-          ))}
-      </div>
-
-      <PageDots count={PAGE_COUNT} page={page} direction={direction} onGo={go} />
-
-      <input
-        ref={fileRef}
-        type="file"
-        hidden
-        accept=".yaml,.yml,.json,.html,.htm,text/yaml,application/json,text/html"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-
-          if (file) {
-            void importFile(file);
-          }
-
-          event.target.value = '';
-        }}
-      />
-
-      {editing && (
-        <EditDock
+    <>
+      <StatusBar watched={dashboard.status} includeDegraded={dashboard.statusDegraded} />
+      <div
+        className="dash"
+        data-editing={editing ? 'on' : undefined}
+        style={{ '--glass-blur': `${config.glass.blur}px` } as CSSProperties}
+      >
+        <ActivityBar
+          pinned={dashboard.pinBar}
+          items={barItems}
+          extras={headerExtras}
+          editing={editing}
+          extensionsOpen={extensionsOpen}
+          onOpenExtensions={() => setExtensionsOpen(true)}
           onAddBookmark={() => openAdd()}
-          onAddGroup={() => setGroupDialog({ mode: 'add' })}
-          onAddWidget={() => setPickerOpen(true)}
-          onDone={() => setEditing(false)}
+          onToggleEdit={() => setEditing((current) => !current)}
+          onOpenSettings={() => setSettingsTab('general')}
+          onContextMenu={barMenu}
         />
-      )}
 
-      {dropHint && (
-        <div className="drop-hint glass" aria-hidden="true">
-          {dropHint === 'file'
-            ? 'Drop to import bookmarks'
-            : 'Drop on a group to add it there, or anywhere else to choose'}
+        <TopBar name={config.name} clock={config.clock}>
+          <SearchBox
+            groups={allGroups(dashboard)}
+            engine={config.search}
+            newTab={config.newTab}
+            commands={commands}
+            inputRef={searchRef}
+          />
+        </TopBar>
+
+        <div className="pages" data-moving={leaving !== null ? '' : undefined}>
+          {Array.from({ length: PAGE_COUNT }, (_unused, index) => index)
+            .filter((index) => index === page || index === leaving)
+            .map((index) => (
+              <div
+                key={index}
+                className="page"
+                data-state={index === page ? 'current' : 'leaving'}
+                data-direction={direction ?? undefined}
+                {...(index === page ? {} : { 'aria-hidden': true, ...inert })}
+                onAnimationEnd={(event) => {
+                  if (event.target === event.currentTarget && index !== page) {
+                    settle(index);
+                  }
+                }}
+              >
+                {renderPage(index)}
+              </div>
+            ))}
         </div>
-      )}
 
-      {bookmarkDialog && (
-        <BookmarkDialog
-          mode={bookmarkDialog.mode}
-          initial={
-            bookmarkDialog.mode === 'edit'
-              ? { ...bookmarkDialog.bookmark, groupId: bookmarkDialog.groupId }
-              : bookmarkDialog.initial
-          }
-          groups={config.groups}
-          onSave={saveBookmark}
-          onDelete={
-            bookmarkDialog.mode === 'edit'
-              ? () => {
-                  removeBookmark(bookmarkDialog.bookmark);
-                  setBookmarkDialog(null);
-                }
-              : undefined
-          }
-          onClose={() => setBookmarkDialog(null)}
-        />
-      )}
+        <PageDots count={PAGE_COUNT} page={page} direction={direction} onGo={go} />
 
-      {groupDialog && (
-        <GroupDialog
-          mode={groupDialog.mode}
-          initial={groupDialog.mode === 'edit' ? groupDialog.group : undefined}
-          onSave={saveGroup}
-          onClose={() => setGroupDialog(null)}
-        />
-      )}
+        <input
+          ref={fileRef}
+          type="file"
+          hidden
+          accept=".yaml,.yml,.json,.html,.htm,text/yaml,application/json,text/html"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
 
-      {pickerOpen && (
-        <WidgetPicker
-          types={enabledWidgetTypes(extensions)}
-          onClose={() => setPickerOpen(false)}
-          onPick={(type) => {
-            setPickerOpen(false);
-            const created: { widget: Widget | null } = { widget: null };
-            apply((current) => {
-              const result = addWidget(current, type);
-              created.widget = result.widget;
-              return result.config;
-            });
-
-            // Most widgets want a word about what to show before they are useful.
-            if (
-              created.widget &&
-              !['calendar', 'agenda', 'hackernews', 'github', 'benchlm', 'tv'].includes(type)
-            ) {
-              setWidgetDialog(created.widget);
+            if (file) {
+              void importFile(file);
             }
+
+            event.target.value = '';
           }}
         />
-      )}
 
-      {widgetDialog && (
-        <WidgetDialog
-          widget={widgetDialog}
-          onClose={() => setWidgetDialog(null)}
-          onSave={(widget) => {
-            setWidgetDialog(null);
-            apply((current) => updateWidget(current, widget.id, widget));
-          }}
-        />
-      )}
+        {editing && (
+          <EditDock
+            onAddBookmark={() => openAdd()}
+            onAddGroup={() => setGroupDialog({ mode: 'add' })}
+            onAddWidget={() => setPickerOpen(true)}
+            onDone={() => setEditing(false)}
+          />
+        )}
 
-      {settingsTab && (
-        <SettingsDrawer
-          config={dashboard}
-          initialTab={settingsTab}
-          appearance={appearance(() => setSettingsTab(null))}
-          onChange={(patch) => apply((current) => ({ ...current, ...patch }))}
-          onReplace={(next: DashboardConfig, message) => applyAll(() => next, message)}
-          onExport={exportBoard}
-          onImportFile={(file) => void importFile(file)}
-          onReset={resetBoard}
-          onClose={() => setSettingsTab(null)}
-        />
-      )}
+        {dropHint && (
+          <div className="drop-hint glass" aria-hidden="true">
+            {dropHint === 'file'
+              ? 'Drop to import bookmarks'
+              : 'Drop on a group to add it there, or anywhere else to choose'}
+          </div>
+        )}
 
-      {extensionsOpen && (
-        <ExtensionsPanel
-          extensions={extensions}
-          onChange={(next, message) =>
-            applyAll((current) => ({ ...current, extensions: next }), message)
-          }
-          onOpenApp={(id) => {
-            setExtensionsOpen(false);
-            openApp(id);
-          }}
-          onClose={() => setExtensionsOpen(false)}
-        />
-      )}
+        {bookmarkDialog && (
+          <BookmarkDialog
+            mode={bookmarkDialog.mode}
+            initial={
+              bookmarkDialog.mode === 'edit'
+                ? { ...bookmarkDialog.bookmark, groupId: bookmarkDialog.groupId }
+                : bookmarkDialog.initial
+            }
+            groups={config.groups}
+            onSave={saveBookmark}
+            onDelete={
+              bookmarkDialog.mode === 'edit'
+                ? () => {
+                    removeBookmark(bookmarkDialog.bookmark);
+                    setBookmarkDialog(null);
+                  }
+                : undefined
+            }
+            onClose={() => setBookmarkDialog(null)}
+          />
+        )}
 
-      {openedApp && <AppSheet app={openedApp} onClose={closeApp} />}
+        {groupDialog && (
+          <GroupDialog
+            mode={groupDialog.mode}
+            initial={groupDialog.mode === 'edit' ? groupDialog.group : undefined}
+            onSave={saveGroup}
+            onClose={() => setGroupDialog(null)}
+          />
+        )}
 
-      {importing && (
-        <ImportDialog
-          plan={importing.plan}
-          fileName={importing.fileName}
-          onMerge={() => finishImport('merge')}
-          onReplace={() => finishImport('replace')}
-          onClose={() => setImporting(null)}
-        />
-      )}
+        {pickerOpen && (
+          <WidgetPicker
+            types={enabledWidgetTypes(extensions)}
+            onClose={() => setPickerOpen(false)}
+            onPick={(type) => {
+              setPickerOpen(false);
+              const created: { widget: Widget | null } = { widget: null };
+              apply((current) => {
+                const result = addWidget(current, type);
+                created.widget = result.widget;
+                return result.config;
+              });
 
-      {menu && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          items={menu.items}
-          label={menu.label}
-          onClose={() => setMenu(null)}
-        />
-      )}
+              // Most widgets want a word about what to show before they are useful.
+              if (
+                created.widget &&
+                !['calendar', 'agenda', 'hackernews', 'github', 'benchlm', 'tv'].includes(type)
+              ) {
+                setWidgetDialog(created.widget);
+              }
+            }}
+          />
+        )}
 
-      <Toasts toasts={toasts} onUndo={(id) => undo(id)} onDismiss={dismiss} />
-    </div>
+        {widgetDialog && (
+          <WidgetDialog
+            widget={widgetDialog}
+            onClose={() => setWidgetDialog(null)}
+            onSave={(widget) => {
+              setWidgetDialog(null);
+              apply((current) => updateWidget(current, widget.id, widget));
+            }}
+          />
+        )}
+
+        {settingsTab && (
+          <SettingsDrawer
+            config={dashboard}
+            initialTab={settingsTab}
+            appearance={appearance(() => setSettingsTab(null))}
+            onChange={(patch) => apply((current) => ({ ...current, ...patch }))}
+            onReplace={(next: DashboardConfig, message) => applyAll(() => next, message)}
+            onExport={exportBoard}
+            onImportFile={(file) => void importFile(file)}
+            onReset={resetBoard}
+            onClose={() => setSettingsTab(null)}
+          />
+        )}
+
+        {extensionsOpen && (
+          <ExtensionsPanel
+            extensions={extensions}
+            onChange={(next, message) =>
+              applyAll((current) => ({ ...current, extensions: next }), message)
+            }
+            onOpenApp={(id) => {
+              setExtensionsOpen(false);
+              openApp(id);
+            }}
+            onClose={() => setExtensionsOpen(false)}
+          />
+        )}
+
+        {openedApp && <AppSheet app={openedApp} onClose={closeApp} />}
+
+        {importing && (
+          <ImportDialog
+            plan={importing.plan}
+            fileName={importing.fileName}
+            onMerge={() => finishImport('merge')}
+            onReplace={() => finishImport('replace')}
+            onClose={() => setImporting(null)}
+          />
+        )}
+
+        {menu && (
+          <ContextMenu
+            x={menu.x}
+            y={menu.y}
+            items={menu.items}
+            label={menu.label}
+            onClose={() => setMenu(null)}
+          />
+        )}
+
+        <Toasts toasts={toasts} onUndo={(id) => undo(id)} onDismiss={dismiss} />
+      </div>
+    </>
   );
 };
